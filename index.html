@@ -1,0 +1,918 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jeu de Mathématiques - Collège</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script>
+    const STATIC_IMAGES_URL = "{% static 'quiz/images/' %}";
+</script>
+  <style>
+  
+    /* ----- Styles généraux ----- */
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #d1f2eb, #f9e79f);
+      text-align: center;
+      padding: 30px;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+    }
+    .container {
+      background: rgba(255, 255, 255, 0.95);
+      padding: 25px;
+      border-radius: 25px;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+      max-width: 750px;
+      margin: auto;
+      backdrop-filter: blur(10px);
+    }
+    .question { font-size: 1.2em; margin-bottom: 20px; }
+    .option {
+      display: block;
+      margin: 15px auto;
+      padding: 20px 30px;
+      font-size: 1.3em;
+      border-radius: 15px;
+      border: 2px solid #3498db;
+      width: 85%;
+      max-width: 600px;
+      background-color: #f7ec7a;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .option:hover { background-color: #1664ac; color: white; transform: scale(1.03); border-color: #0e3a5c; }
+    #feedback { margin-top: 15px; font-weight: bold; font-size: 1.1em; }
+    button {
+      padding: 12px 25px;
+      margin: 10px 5px;
+      border-radius: 12px;
+      background: #db8534;
+      color: #111;
+      border: none;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.3s, transform 0.2s;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    button:hover { background: #2e86c1; color: white; transform: translateY(-2px); }
+    #timer { font-weight: bold; margin: 10px 0; color: red; font-size: 1.2em; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    th { background: #f1c40f; font-weight: 600; }
+    th, td { border: 1px solid #ddd; padding: 12px 8px; }
+    .correct { background-color: #27ae60 !important; color: white; }
+    .wrong { background-color: #e74c3c !important; color: white; }
+
+    /* ----- Admin ----- */
+    .admin-panel {
+      max-width: 1100px;
+      margin: auto;
+      background: #ffffff;
+      border-radius: 25px;
+      padding: 30px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+      backdrop-filter: blur(5px);
+    }
+    .admin-panel h2 { font-size: 2em; color: #2c3e50; margin-bottom: 10px; }
+    .admin-stats { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin: 20px 0; }
+    .stat-card {
+      background: linear-gradient(145deg, #f0f4f8, #fff);
+      border-radius: 20px;
+      padding: 20px;
+      min-width: 150px;
+      flex: 1 1 180px;
+      box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+      transition: transform 0.2s;
+    }
+    .stat-card:hover { transform: translateY(-5px); }
+    .stat-card .number { font-size: 2.2em; font-weight: bold; color: #2c3e50; }
+    .stat-card .label { font-size: 0.9em; color: #7f8c8d; }
+    .admin-table-container { overflow-x: auto; margin: 20px 0; }
+    .admin-table { width: 100%; border-collapse: collapse; font-size: 0.95em; }
+    .admin-table th { background: #34495e; color: white; padding: 14px 10px; }
+    .admin-table td { background: #fafafa; border-bottom: 1px solid #ecf0f1; }
+    .admin-table tr:hover td { background: #f0f3f5; }
+    .chart-container { background: #fff; border-radius: 20px; padding: 20px; margin: 30px 0; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+    canvas#adminChart { max-height: 400px; }
+    .admin-btn { background: #8e44ad; color: white; margin-left: 10px; font-weight: bold; }
+    .admin-btn:hover { background: #6c3483; }
+    .admin-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 15px; margin-top: 25px; }
+
+    /* ----- Photo ----- */
+    .photo-upload { display: flex; flex-direction: column; align-items: center; margin: 15px 0; }
+    #photoPreview { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid #3498db; margin-top: 10px; display: none; }
+    .form-row { margin: 10px 0; display: flex; flex-direction: column; align-items: center; }
+    .form-row select, .form-row input[type="text"], .form-row input[type="number"] {
+      padding: 10px; border-radius: 10px; border: 2px solid #3498db; width: 80%; max-width: 400px;
+    }
+
+    /* ----- Boutons QCM ----- */
+    .group-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 15px 0; }
+    .group-btn { background: #2ecc71; color: white; font-size: 0.9em; min-width: 150px; }
+    .group-btn:hover { background: #27ae60; }
+
+    /* ----- Modale ----- */
+    .modal {
+      display: none; position: fixed; z-index: 1000; left: 0; top: 0;
+      width: 100%; height: 100%; background: rgba(0,0,0,0.6);
+      align-items: center; justify-content: center;
+    }
+    .modal-content {
+      background: white; padding: 30px; border-radius: 25px;
+      box-shadow: 0 15px 30px rgba(0,0,0,0.3); width: 350px; text-align: center;
+    }
+    .modal-content input {
+      width: 80%; padding: 12px; border-radius: 12px; border: 2px solid #3498db;
+      margin: 15px 0; font-size: 1em;
+    }
+    .modal-content button { margin: 5px; }
+
+    /* ----- Groupes QCM (sans graphique) ----- */
+    .qcm-group {
+      margin: 30px 0; padding: 20px; background: #fafafa;
+      border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    .qcm-group h4 {
+      background: #3498db; color: white; padding: 12px; border-radius: 12px; margin-bottom: 15px;
+    }
+    .group-table {
+      width: 100%; border-collapse: collapse; font-size: 0.9em; margin: 10px 0;
+    }
+    .group-table th { background: #2c3e50; color: white; padding: 10px; }
+    .group-table td { background: white; border-bottom: 1px solid #ddd; padding: 8px; }
+  </style>
+</head>
+<body>
+  <!-- Modale admin -->
+  <div id="adminModal" class="modal">
+    <div class="modal-content">
+      <h3>🔐 Mot de passe administrateur</h3>
+      <input type="password" id="adminPasswordInput" placeholder="Mot de passe"><br>
+      <button onclick="validerAdminPassword()">Valider</button>
+      <button onclick="fermerModal()">Annuler</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Page d'accueil -->
+    <div id="start">
+      <h2>Entrez vos informations pour commencer</h2>
+      <div class="form-row"><label>Nom complet :</label><input type="text" id="username" placeholder="Votre nom complet"></div>
+      <div class="form-row">
+        <label>Niveau scolaire :</label>
+        <select id="niveau" onchange="mettreAJourCours()">
+          <option value="1AC">1ère année collège (1AC)</option>
+          <option value="2AC">2ème année collège (2AC)</option>
+          <option value="3AC">3ème année collège (3AC)</option>
+        </select>
+      </div>
+      <div class="photo-upload">
+        <label>Photo (facultatif) :</label>
+        <input type="file" id="photoInput" accept="image/*" capture="user">
+        <img id="photoPreview" alt="Aperçu photo">
+      </div>
+      <div id="qcmContainer">
+        <div class="form-row"><label>Choisissez un QCM :</label><div class="group-buttons" id="groupButtons"></div></div>
+        <div class="form-row"><label>Nombre de questions :</label><input type="number" id="nbQuestions" min="1" max="100" value="10" step="1"></div>
+      </div>
+      <br>
+      <button onclick="startGame()">Commencer</button>
+      <button class="admin-btn" onclick="ouvrirModalAdmin()">🔑 Administration</button>
+    </div>
+
+    <!-- Quiz -->
+    <div id="quiz" style="display:none">
+      <h2 id="titre"></h2>
+      <div id="timer"></div>
+      <div class="question" id="question"></div>
+      <div id="options"></div>
+      <div id="feedback"></div>
+      <div id="scoreDisplay"></div>
+      <button>Prof: Ettahri Faouzi</button>
+      <button onclick="nextQuestion()">Next</button>
+    </div>
+
+    <!-- Résultat -->
+    <div id="resultat" style="display:none">
+      <h3>🎉 Fin du quiz !</h3>
+      <p id="finalScore"></p>
+      <button onclick="retourAccueil()">Retour</button>
+      <button onclick="restartGame()">Rejouer</button>
+    </div>
+
+    <!-- Page Admin -->
+    <div id="admin" style="display:none" class="admin-panel">
+      <h2>📊 Tableau de bord administrateur</h2>
+      <div class="admin-stats" id="adminStatsCards"></div>
+      <div class="chart-container"><canvas id="adminChart"></canvas></div>
+      <h3>📋 Détails par élève (global)</h3>
+      <div class="admin-table-container">
+        <table class="admin-table" id="adminTable">
+          <thead><tr><th>Photo</th><th>Nom</th><th>Niveau</th><th>Quiz</th><th>Score total</th><th>Moyenne</th><th>Dernière activité</th></tr></thead>
+          <tbody id="adminBody"></tbody>
+        </table>
+      </div>
+
+      <!-- Résultats par QCM (sans graphiques secondaires) -->
+      <h3>📊 Résultats par groupe de QCM</h3>
+      <div id="perQcmContainer"></div>
+
+      <div class="admin-actions">
+        <button onclick="retourAccueil()">🏠 Retour</button>
+        <button onclick="clearResultsAdmin()">🗑️ Supprimer tout</button>
+        <button onclick="exportResultsToCSV()" style="background:#27ae60;">📥 Exporter CSV</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ======================== QUESTIONS ========================
+    const allQuestionsByLevel = {
+      "1AC": {
+        "Les opérations sur les nombres entiers et décimaux": [
+          { question: "",image: "{% static 'quiz/images/1.png' %}"
+, options: ["180", "24", "20", "44"], answer: 2 },
+          { question: "", image: "{% static 'quiz/images/2.png' %}", options: ["16", "32", "24", "42"], answer: 0 },
+          { question: "", image: "{% static 'quiz/images/3.png' %}", options: ["5+ 10×4", "5×10 +4", "5×10 -4", "5×10 + 5×4"], answer: 3 },
+          { question: "", image: "{% static 'quiz/images/4.png' %}", options: ["80", "40", "110", "41"], answer: 2 },
+          { question: "", image: "{% static 'quiz/images/9.png' %}", options: ["14", "8", "11", "4"], answer: 1 },
+          { question: "", image: "{% static 'quiz/images/10.png' %}", options: ["80", "50", "40", "41"], answer: 2 },
+          { question: "", image: "{% static 'quiz/images/5.png' %}", options: ["20", "18", "14", "24"], answer: 3 },
+          { question: "", image: "{% static 'quiz/images/6.png' %}", options: ["1", "2", "3", "4"], answer: 1 },
+          { question: "", image: "{% static 'quiz/images/7.png' %}", options: ["37", "38", "39", "40"], answer: 2 },
+          { question: "", image: "{% static 'quiz/images/8.png' %}", options: ["30", "7", "26", "20"], answer: 1 }
+        ],
+        "Les fraction": [
+          { question: "déterminer la fraction:", options: ["1.5/3", "2.5/3.5", "4.5/3","2/7"], answer: 3 },
+          { question: "", image: "{% static 'quiz/images/11.png' %}", options: ["12/12", "5/12", "7/12", "12/6"], answer: 3 },
+          { question: "", image: "{% static 'quiz/images/12.png' %}", options: ["1/12", "9/15", "1/3", "1/15"], answer: 1 },
+          { question: "", image: "{% static 'quiz/images/13.png' %}", options: ["6/12", "5/35", "6/35", "12/35"], answer: 2 },
+          { question: "", image: "{% static 'quiz/images/14.png' %}", options: ["10/12", "8/15", "7/12", "10/7"], answer: 1 },
+          { question: "",image: "{% static 'quiz/images/15.png' %}", options: ["4/3", "3/3", "2/3","1/3"], answer: 3 },
+          { question: "", image: "{% static 'quiz/images/16.png' %}", options: ["12/6", "5/6", "7/6", "22/6"], answer: 3 },
+          { question: "", image: "{% static 'quiz/images/17.png' %}", options: ["4/12", "5/15", "3/3", "4/15"], answer: 1 },
+          { question: "",image: "{% static 'quiz/images/18.png' %}", options: ["3/36", "5/6", "15/36", "5/36"], answer: 2 },
+          { question: "", image: "{% static 'quiz/images/19.png' %}", options: ["10/18", "12/24", "7/18", "10/24"], answer: 1 }
+        ],
+        "Les nombres relatifs": [
+          { question: "les nombres relatifs ?", options: ["1; 2 ;-1.5 ; 3,5", "-1 ; 2 ; -3 ; 0", "0 ; 1 ; 1.5 ; 3", "2; 3; 0.5; 4"], answer: 1 },
+          { question: "les nombres négatifs?", options: ["-1; -2 ; -4; -5", "-2 ; 2 ; 3 ; -1", "6 ; 7 ; 8 ; 9", "-5; 6; -8; -9"], answer: 0 },
+          { question: "les nombres positifs", options: ["-1; -2 ; -4; -5", "6 ; 7 ; 8 ; 9 ", "-5 ; 6 ; -8 ; -9 ", " 2 ; -1 ; 3 ; 4 "], answer: 1 },
+          { question: "l'abscice de point A est -2 et de point B est 6 la distance entre A et B est:", options: ["8", "4", "-4", "6"], answer: 0 },
+          { question: "l'opposée de nombre -4", options: ["4", "-4", "0", "8"], answer: 0 },
+          { question: "", image: "{% static 'quiz/images/20.png' %}", options: ["13", "3", "-3", "-13"], answer: 1 },
+          { question: "Quel est le produit de -3 et -2 ?", options: ["-6", "0", "6", "-5"], answer: 2 },
+          { question: "", image: "{% static 'quiz/images/21.png' %}", options: ["-3", "3", "-2", "2"], answer: 0 },
+          { question: "", image: "{% static 'quiz/images/22.png' %}", options: ["-2", "12", "2", "-12"], answer: 3 },
+          { question: "", image: "{% static 'quiz/images/23.png' %}", options: ["10", "2", "4", "-4"], answer: 0 }
+        ],
+        "Puissances": [
+          { question: "", image: "24.png", options: ["6", "8", "9", "4"], answer: 1 },
+          { question: "", image: "25.png", options: ["9", "6", "3", "0"], answer: 0 },
+          { question: "", image: "26.png", options: ["0", "1", "5", "25"], answer: 1 },
+          { question: "", image: "27.png", options: ["100", "200", "10", "1000"], answer: 0 },
+          { question: "", image: "28.png", options: ["81", "12", "24", "64"], answer: 0 },
+          { question: "", image: "29.png", options: [{text: "",image: "34.png"}, {text: "",image: "35.png"}, {text: "",image: "36.png"}, {text: "",image: "37.png"}], answer: 1 },
+          { question: "", image: "30.png", options: [{text: "",image: "38.png"}, {text: "",image: "39.png"}, {text: "",image: "40.png"}, {text: "",image: "41.png"}], answer: 0 },
+          { question: "", image: "31.png", options: [{text: "",image: "42.png"}, {text: "",image: "43.png"}, {text: "",image: "44.png"}, {text: "",image: "45.png"}], answer: 3 },
+          { question: "", image: "32.png", options: [{text: "",image: "46.png"}, {text: "",image: "47.png"}, {text: "",image: "48.png"}, {text: "",image: "49.png"}], answer: 2 },
+          { question: "", image: "33.png", options: [{text: "",image: "50.png"}, {text: "",image: "51.png"}, {text: "",image: "52.png"}, {text: "",image: "53.png"}], answer: 0 },
+          { question: "l'ecriture scientifique de 5000 ?", options: [{text: "",image: "54.png"}, {text: "",image: "55.png"}, {text: "",image: "56.png"}, {text: "",image: "57.png"}], answer: 1 }
+        ],
+        "Parallélisme et Perpendiculaires": [
+          { question: "La notation de demi-droite d'origine B et passe par A ?", options: ["[AB]", "AB", "[BA)", "(AB)"], answer: 2 },
+          { question: "Comment s’appelle une droite passant par A et B ?", options: ["[AB]", "AB", "(AB)", "A-B"], answer: 2 },
+          { question: "Parmi les propositions suivantes, laquelle est un segment ?", options: ["AB", "[AB]", "(AB)", "A et B"], answer: 1 },
+          { question: "Deux droites qui ne se croisent jamais sont :", options: ["Perpendiculaires", "Égales", "Parallèles", "Identiques"], answer: 2 },
+          { question: "Quelle figure a une longueur mesurable ?", options: ["Une droite", "Un segment",  "Une demi-droite"], answer: 1 }
+        ],
+        "Aires et périmètre": [
+          { question: "La surface d'un triangle de base 5cm et l'hauteur 4cm:", options: ["10", "15", "20", "18"], answer: 0 },
+          { question: "L'aire d'un carré de côté 5cm :", options: ["10 ", "20 ", "25 ", "30 "], answer: 2 },
+          { question: "Quel est le périmètre d’un parallélogramme de côtés 4 cm et 6 cm ?", options: ["20 cm", "24 cm", "10 cm", "12 cm"], answer: 0 },
+          { question: "le périmètre de losange de côté 6cm est:", options: ["12","18cm", "36cm", "24cm"], answer: 3 },
+          { question: "La surface d'un rectangle des côtés 6cm et 5cm:", options: ["22", "11", "30", "15"], answer: 2 }
+        ],
+        "Angles et triangles": [
+          { question: "Un angle obtus est :", options: ["0", "entre 0 et 90", "90", "entre 90 et 180"], answer: 3 },
+          { question: "déterminer deux angle complémentaire :", options: ["30 et 60", "35 et 145", "60 et 40", "100 et 85"], answer: 0 },
+          { question: "déterminer deux angle supplémentaire :", options: ["100 et 85", "60 et 40", "30 et 60", "35 et 145"], answer: 3 },
+          { question: "un traingle isocèle est :", options: ["deux côtés sont éguax", "tous les côtés sont égaux ", "tous les angles égaux", "la somme des angle est 140"], answer: 0 },
+          { question: "un triangle réctangle  :", options: ["admet un angle obtus", "admet angle droit", "tous les angle aigau", "la somme des angles est 360"], answer: 1 }
+        ],
+        "Droites particuliersdans un triangles": [
+          { question: " les droites passant par les milieux des côtée de triangle sont ", options: ["Bissectrices", "Médiatrices", "Hauters"], answer: 1 },
+          { question: "Les droites  divisons les angles d'un triangle en angles égaux ", options: ["Bissectrices", "Médiatrices", "Hauters"], answer: 0 },
+          { question: "Les droites passant par un sommet du tringle et perpendiculaires au côtés opposée à ce sommet", options: ["Bissectrices", "Médiatrices", "Hauters"], answer: 2 },
+          { question: "les médiatrice d'un triangle donne", options: ["centre de cercle inscrit ", "centre de cercle circonscrit", "l'orthocentre"], answer: 1 },
+          { question: "les hauteurs de triangle donne", options: ["centre de cercle inscrit ", "centre de cercle circonscrit", "l'orthocentre"], answer: 2 }
+        ],
+        "Calcul litéral": [
+          { question: "", image: "58.png", options: [{text: "",image: "59.png"}, {text: "",image: "60.png"}, {text: "",image: "61.png"}, {text: "",image: "62.png"}], answer: 1 },
+          { question: "", image: "63.png", options: ["A=4", "A=5", "A= 6", "A = 7"], answer: 0 },
+          { question: "", image: "64.png", options: [{text: "",image: "65.png"}, {text: "",image: "66.png"}, {text: "",image: "67.png"}, {text: "",image: "68.png"}], answer: 2 },
+          { question: "", image: "69.png", options: [{text: "",image: "70.png"}, {text: "",image: "71.png"}, {text: "",image: "72.png"}, {text: "",image: "73.png"}], answer: 3 },
+          { question: "", image: "74.png", options: [{text: "",image: "75.png"}, {text: "",image: "76.png"}, {text: "",image: "77.png"}], answer: 0 }
+        ],
+        "équations": [
+          { question: "", image: "78.png", options: ["x = 0", "x = 1", "x = 2", "x = 3"], answer: 2 },
+          { question: "", image: "79.png", options: ["x = 5", "x = 3", "x = 6", "x = 7"], answer: 0 },
+          { question: "", image: "80.png", options: ["x = 6", "x = 8", "x = 2", "x = 4"], answer: 1 },
+          { question: "", image: "81.png", options: ["x = 15", "x = 5", "x = 10", "x = 0"], answer: 1 },
+          { question: "", image: "82.png", options: ["x = 3", "x = 2", "x = 6", "x = 5"], answer: 0 }
+        ],
+        "Symétrie centrale": [
+          { question: "le symétrique central d'un angle est :", options: ["une point", "une segment", "une droite", "un angle"], answer: 3 },
+          { question: "le symétrique central d'un point est", options: ["une point", "une segment", "une droite", "un angle"], answer: 0 },
+          { question: "le symétrique central d'un segment est", options: ["une point", "une segment", "une droite", "un angle"], answer: 1 },
+          { question: "le symétrique central d'une cercle est", options: ["une point", "une segment", "une cercle", "un angle"], answer: 2 },
+          { question: "le symétrique central d'une droite est", options: ["une point", "une segment", "une droite", "un angle"], answer: 2 }
+        ],
+        "Parallélogramme": [
+          { question: "Un parallélogramme a deux paires de côtés :", options: ["Égaux et parallèles", "Perpendiculaires", "Inégaux"], answer: 0 },
+          { question: "Les diagonales d’un parallélogramme se coupent en :", options: ["Deux points égaux", "Un seul point", "Trois points", "Aucun point"], answer: 1 },
+          { question: "Quel est le périmètre d’un parallélogramme de côtés 4 cm et 6 cm ?", options: ["20 cm", "24 cm", "10 cm", "12 cm"], answer: 0 },
+          { question: "Un parallélogramme peut être aussi :", options: ["Un rectangle", "Un carré", "Un losange", "Tous les choix"], answer: 3 },
+          { question: "Le carré est un parallélogramme :", options: ["Oui", "Non", "Cela dépend", "Pas sûr"], answer: 0 }
+        ],
+        "Quadrilatères particuliers": [
+          { question: "Un rectangle a quatre angles :", options: ["Égaux", "Aigus", "Obtus", "Aiguisés"], answer: 0 },
+          { question: "Un losange a :", options: ["Quatre côtés égaux", "Deux côtés égaux", "Une seule diagonale", "Aucun côté égal"], answer: 0 },
+          { question: "Un carré est aussi un :", options: ["Rectangle", "Rhombe", "Parallélogramme", "Tous les choix"], answer: 3 },
+          { question: "Un trapèze a deux côtés :", options: ["Parallèles", "Inégaux", "Perpendiculaires", "Tous les choix"], answer: 0 },
+          { question: "Un parallélogramme est un quadrilatère :", options: ["Non", "Oui", "Pas toujours", "Cela dépend"], answer: 1 }
+        ],
+        "le cercle": [
+          { question: "la plus grand distance dans le cercle appelle", options: ["cord","diamètre", "rayon", "arc"], answer: 1 },
+          { question: "si le diamètre d'un cercle est 6cm alors le rayon égal", options: ["3", "4", "5", "6"], answer: 0 },
+          { question: "le périmètre d'un cercle est :", options: [{text: "",image: "85.png"}, {text: "",image: "86.png"}, {text: "",image: "83.png"}, {text: "",image: "84.png"}], answer: 3 },
+          { question: "l'aire de disque est :", options: [{text: "",image: "89.png"}, {text: "",image: "88.png"}, {text: "",image: "87.png"}, {text: "",image: "90.png"}], answer: 2 },
+          { question: "la distance entre le centre et l'arc de cercle est un", options: ["cord","diamètre", "rayon", "arc"], answer: 2 }
+        ],
+        "prismes droite et cylindres de révolution": [
+          { question: "la surface latéral d'un prisme ou cylindre de révolution", options: ["le périmètre de base × l'hauteur", "l'aire de base × l'hauteur", "2 × le périmètre de base × l'hauteur", "2×l'aire de base × l'hauteur"], answer: 0 },
+          { question: "la volume d'un prisme ou cylindre de révolution", options: ["le périmètre de base × l'hauteur", "l'aire de base × l'hauteur", "2 × le périmètre de base × l'hauteur", "2×l'aire de base × l'hauteur"], answer: 1},
+          { question: "quelle est la basse de cylindre", options: ["carré", "triangle", "cercle", "rectangle"], answer: 2 },
+          { question: "combient des face de cube", options: ["2", "4", "6", "8"], answer: 2 }
+        ]
+      },
+      "2AC": {
+        "Les nombres rationnels": [
+          { question: "Quel est le produit de 2/3 et 5/4 ?", options: ["7/7", "10/12", "5/6", "8/15"], answer: 2 },
+          { question: "Simplifier 15/20 :", options: ["3/4", "5/10", "15/20", "1/2"], answer: 0 },
+          { question: "Addition de 1/2 + 1/3 :", options: ["2/5", "5/6", "1/6", "2/6"], answer: 1 },
+          { question: "L'inverse de 3/7 est :", options: ["7/3", "-3/7", "3/7", "1"], answer: 0 },
+          { question: "Quel est le nombre décimal correspondant à 7/8 ?", options: ["0.875", "0.78", "0.88", "0.7"], answer: 0 },
+          { question: "Comparer 3/4 et 5/6 :", options: ["3/4 < 5/6", "3/4 = 5/6", "3/4 > 5/6", "impossible"], answer: 0 },
+          { question: "Calculer 2/5 + 1/4 :", options: ["3/9", "13/20", "8/20", "3/20"], answer: 1 }
+        ],
+        "Calcul littéral (développement)": [
+          { question: "Développer (x+2)(x+3) :", options: ["x²+5x+6", "x²+6x+5", "x²+5x+5", "2x+5"], answer: 0 },
+          { question: "Factoriser x²-9 :", options: ["(x-3)²", "(x-3)(x+3)", "(x+9)(x-1)", "impossible"], answer: 1 },
+          { question: "Si a=2, calculer 3a²-2a+1 :", options: ["9", "11", "13", "7"], answer: 1 },
+          { question: "Développer (2x-1)² :", options: ["4x²-4x+1", "4x²-1", "2x²-2x+1", "4x²-2x+1"], answer: 0 },
+          { question: "Factoriser 6x+9 :", options: ["3(2x+3)", "6(x+1.5)", "2(3x+4.5)", "3(2x+3)"], answer: 0 },
+          { question: "Calculer (a+b)(a-b) pour a=5, b=3 :", options: ["16", "8", "15", "2"], answer: 0 }
+        ],
+        "Équations et inéquations": [
+          { question: "Résoudre 2x+3=11 :", options: ["x=4", "x=5", "x=3", "x=6"], answer: 0 },
+          { question: "L'inéquation 3x-4 < 5 a pour solution :", options: ["x < 3", "x > 3", "x < 1", "x < 9/3"], answer: 0 },
+          { question: "Si 5x = 20, alors x = ?", options: ["4", "5", "100", "15"], answer: 0 },
+          { question: "Résoudre (x-1)/2 = 3 :", options: ["x=7", "x=5", "x=6", "x=4"], answer: 0 },
+          { question: "Quelle valeur de x vérifie 2x-5 = x+3 ?", options: ["8", "2", "5", "3"], answer: 0 },
+          { question: "L'ensemble des solutions de 4x ≤ 12 est :", options: ["x ≤ 3", "x < 3", "x ≥ 3", "x = 3"], answer: 0 }
+        ],
+        "Théorème de Pythagore": [
+          { question: "Dans un triangle rectangle de côtés 3 et 4, l'hypoténuse mesure :", options: ["5", "6", "7", "8"], answer: 0 },
+          { question: "Si un triangle a des côtés 5, 12, 13, est-il rectangle ?", options: ["Oui", "Non", "Cela dépend", "Peut-être"], answer: 0 },
+          { question: "Calculez la longueur manquante : a=6, b=8, c=? (hypoténuse)", options: ["10", "9", "11", "14"], answer: 0 },
+          { question: "Le carré de l'hypoténuse est égal à :", options: ["Somme des carrés des deux autres côtés", "Différence des carrés", "Produit des côtés", "Somme des côtés"], answer: 0 },
+          { question: "ABC rectangle en A, AB=9, AC=12, BC=? ", options: ["15", "21", "10", "13"], answer: 0 },
+          { question: "Un triangle de côtés 7, 24, 25 est-il rectangle ?", options: ["Oui", "Non", "Seulement si l'angle droit est entre 7 et 24", "Impossible"], answer: 0 }
+        ],
+        "Angles inscrits": [
+          { question: "Un angle inscrit mesure la moitié de l'angle au centre associé.", options: ["Vrai", "Faux", "Parfois", "Jamais"], answer: 0 },
+          { question: "Si l'angle au centre mesure 80°, l'angle inscrit mesure :", options: ["40°", "80°", "160°", "20°"], answer: 0 },
+          { question: "Deux angles inscrits interceptant le même arc sont :", options: ["Égaux", "Complémentaires", "Supplémentaires", "Opposés"], answer: 0 },
+          { question: "Un angle inscrit qui intercepte un demi‑cercle mesure :", options: ["90°", "180°", "45°", "0°"], answer: 0 },
+          { question: "Dans un cercle, l'angle au centre associé à un angle inscrit de 25° mesure :", options: ["50°", "25°", "12.5°", "75°"], answer: 0 }
+        ]
+      },
+      "3AC": {
+        "Racines carrées": [
+          { question: "√64 = ?", options: ["8", "4", "16", "6"], answer: 0 },
+          { question: "Simplifier √50 :", options: ["5√2", "2√5", "10√5", "25"], answer: 0 },
+          { question: "Calculer √9 + √16 :", options: ["7", "5", "25", "12"], answer: 0 },
+          { question: "√(a²) = ?", options: ["a", "|a|", "a²", "2a"], answer: 1 },
+          { question: "Résoudre x² = 25 :", options: ["x=5", "x=5 ou x=-5", "x=25", "x=0"], answer: 1 },
+          { question: "√18 simplifié = ?", options: ["3√2", "2√3", "9√2", "6"], answer: 0 },
+          { question: "√(4/9) = ?", options: ["2/3", "4/9", "2/9", "16/81"], answer: 0 }
+        ],
+        "Identités remarquables": [
+          { question: "(a+b)² = ?", options: ["a²+b²", "a²+2ab+b²", "a²-2ab+b²", "a²-b²"], answer: 1 },
+          { question: "Développer (x-4)² :", options: ["x²-8x+16", "x²-16", "x²+8x+16", "x²-4x+16"], answer: 0 },
+          { question: "Factoriser x²-25 :", options: ["(x-5)²", "(x-5)(x+5)", "(x+5)²", "impossible"], answer: 1 },
+          { question: "Calculer 101² en utilisant (100+1)² :", options: ["10201", "10001", "10101", "10021"], answer: 0 },
+          { question: "Développer (3x+2)² :", options: ["9x²+12x+4", "9x²+4", "9x²+6x+4", "3x²+12x+4"], answer: 0 },
+          { question: "Factoriser 4x²-9 :", options: ["(2x-3)(2x+3)", "(4x-3)(x+3)", "(2x-3)²", "(4x+9)(x-1)"], answer: 0 }
+        ],
+        "Fonctions affines": [
+          { question: "Soit f(x)=2x+1. L'image de 3 est :", options: ["7", "5", "6", "4"], answer: 0 },
+          { question: "Le coefficient directeur de f(x)=-3x+2 est :", options: ["-3", "2", "3", "-2"], answer: 0 },
+          { question: "f(x)=4x-2 est une fonction :", options: ["Affine", "Linéaire", "Constante", "Inverse"], answer: 0 },
+          { question: "L'ordonnée à l'origine de f(x)=5x+7 est :", options: ["5", "7", "12", "0"], answer: 1 },
+          { question: "Représentation graphique d'une fonction affine :", options: ["Une droite", "Une parabole", "Une hyperbole", "Un cercle"], answer: 0 }
+        ],
+        "Trigonométrie": [
+          { question: "Dans un triangle rectangle, cos = ?", options: ["adjacent/hypoténuse", "opposé/hypoténuse", "opposé/adjacent", "hypoténuse/adjacent"], answer: 0 },
+          { question: "sin 30° = ?", options: ["0.5", "√3/2", "1", "0"], answer: 0 },
+          { question: "tan = ?", options: ["sin/cos", "cos/sin", "1/sin", "1/cos"], answer: 0 },
+          { question: "Si cos x = 0.6, alors sin x (angle aigu) vaut environ :", options: ["0.8", "0.4", "0.6", "1"], answer: 0 },
+          { question: "Dans un triangle rectangle, sin² + cos² = ?", options: ["1", "0", "2", "0.5"], answer: 0 },
+          { question: "sin(60°) = ?", options: ["√3/2", "0.5", "1/√2", "1"], answer: 0 }
+        ],
+        "Théorème de Thalès": [
+          { question: "Thalès s'applique dans une configuration de :", options: ["Triangles emboîtés", "Cercles", "Quadrilatères", "Symétries"], answer: 0 },
+          { question: "Si AM/AB = AN/AC, alors (MN) // (BC).", options: ["Vrai", "Faux", "Cela dépend", "Uniquement si M,N milieux"], answer: 0 },
+          { question: "Dans la configuration de Thalès, les rapports sont :", options: ["Égaux", "Opposés", "Inverses", "Aléatoires"], answer: 0 },
+          { question: "Si AB=8, AM=4, AC=10, alors AN=? (MN // BC)", options: ["5", "6", "4", "8"], answer: 0 },
+          { question: "La réciproque du théorème de Thalès permet de démontrer :", options: ["Que deux droites sont parallèles", "Qu'un triangle est rectangle", "La longueur d'un côté", "La nature d'un triangle"], answer: 0 }
+        ]
+      }
+    };
+
+    // ======================== GROUPES DE QCM ========================
+    const qcmGroups = {
+      "1AC": [
+        { label: "Nombres + Fractions + Relatifs", courses: ["Les opérations sur les nombres entiers et décimaux", "Les fraction", "Les nombres relatifs"] },
+        { label: "Puissances + Parallélisme + Aires", courses: ["Puissances", "Parallélisme et Perpendiculaires", "Aires et périmètre"] },
+        { label: "Angles + Droites part. + Calcul litt.", courses: ["Angles et triangles", "Droites particuliersdans un triangles", "Calcul litéral"] },
+        { label: "Équations + Symétrie + Parallélo.", courses: ["équations", "Symétrie centrale", "Parallélogramme"] },
+        { label: "Quadrilatères + Cercle + Prismes", courses: ["Quadrilatères particuliers", "le cercle", "prismes droite et cylindres de révolution"] }
+      ],
+      "2AC": [
+        { label: "Nombres rationnels", courses: ["Les nombres rationnels"] },
+        { label: "Calcul littéral", courses: ["Calcul littéral (développement)"] },
+        { label: "Équations et inéquations", courses: ["Équations et inéquations"] },
+        { label: "Théorème de Pythagore", courses: ["Théorème de Pythagore"] },
+        { label: "Angles inscrits", courses: ["Angles inscrits"] }
+      ],
+      "3AC": [
+        { label: "Racines carrées", courses: ["Racines carrées"] },
+        { label: "Identités remarquables", courses: ["Identités remarquables"] },
+        { label: "Fonctions affines", courses: ["Fonctions affines"] },
+        { label: "Trigonométrie", courses: ["Trigonométrie"] },
+        { label: "Théorème de Thalès", courses: ["Théorème de Thalès"] }
+      ]
+    };
+
+    // ======================== VARIABLES GLOBALES ========================
+    let currentLevel = "1AC";
+    let selectedCourses = [];
+    let currentQuestionIndex = 0;
+    let score = 0;
+    let timer;
+    let timeLeft = 30;
+    let startTime;
+    let selectedQuestions = [];
+    let currentPhotoData = null;
+    const ADMIN_PASSWORD = "admin123";
+    let adminChart = null;
+
+    // ======================== UTILITAIRES POUR LE MELANGE ========================
+    function shuffleArray(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function getOptionText(opt) {
+      if (typeof opt === 'object' && opt.text !== undefined) {
+        return opt.text;
+      }
+      return opt;
+    }
+
+    // ======================== COMPRESSION D'IMAGE ========================
+    function compressImage(file, maxWidth, maxHeight, quality) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const img = new Image();
+          img.onload = function() {
+            let width = img.width;
+            let height = img.height;
+
+            if (width > maxWidth) {
+              height = height * (maxWidth / width);
+              width = maxWidth;
+            }
+            if (height > maxHeight) {
+              width = width * (maxHeight / height);
+              height = maxHeight;
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL('image/jpeg', quality);
+            resolve(dataUrl);
+          };
+          img.onerror = reject;
+          img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // ======================== PHOTO ========================
+    document.getElementById('photoInput').addEventListener('change', function(e) {
+      const file = this.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = ev => {
+          document.getElementById('photoPreview').src = ev.target.result;
+          document.getElementById('photoPreview').style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      } else {
+        document.getElementById('photoPreview').style.display = 'none';
+      }
+    });
+
+    // ======================== MODALE ADMIN ========================
+    function ouvrirModalAdmin() { document.getElementById('adminModal').style.display = 'flex'; }
+    function fermerModal() { document.getElementById('adminModal').style.display = 'none'; }
+    function validerAdminPassword() {
+      if (document.getElementById('adminPasswordInput').value === ADMIN_PASSWORD) {
+        fermerModal();
+        hideAllSections();
+        document.getElementById('admin').style.display = 'block';
+        chargerAdmin();
+      } else {
+        alert('Mot de passe incorrect !');
+      }
+    }
+
+    function hideAllSections() {
+      document.getElementById('start').style.display = 'none';
+      document.getElementById('quiz').style.display = 'none';
+      document.getElementById('resultat').style.display = 'none';
+      document.getElementById('admin').style.display = 'none';
+    }
+
+    // ======================== BOUTONS QCM ========================
+    function mettreAJourCours() {
+      const niveau = document.getElementById('niveau').value;
+      currentLevel = niveau;
+      const container = document.getElementById('groupButtons');
+      const nbInput = document.getElementById('nbQuestions');
+      container.innerHTML = '';
+      const groups = qcmGroups[niveau];
+      groups.forEach(group => {
+        const btn = document.createElement('button');
+        btn.className = 'group-btn';
+        btn.textContent = group.label;
+        btn.onclick = () => {
+          document.querySelectorAll('.group-btn').forEach(b => b.style.background = '#2ecc71');
+          btn.style.background = '#1e8449';
+          selectedCourses = group.courses;
+        };
+        container.appendChild(btn);
+      });
+      selectedCourses = [];
+      nbInput.value = (niveau === '1AC') ? 30 : 10;
+    }
+
+    // ======================== QUIZ ========================
+    function startGame() {
+      const username = document.getElementById('username').value.trim();
+      if (!username) { alert('Entrez votre nom.'); return; }
+      if (selectedCourses.length === 0) { alert('Choisissez un QCM.'); return; }
+
+      let pool = [];
+      selectedCourses.forEach(c => {
+        if (allQuestionsByLevel[currentLevel][c]) pool = pool.concat(allQuestionsByLevel[currentLevel][c]);
+      });
+      if (pool.length === 0) { alert('Pas de questions.'); return; }
+
+      let nb = parseInt(document.getElementById('nbQuestions').value) || 10;
+      nb = Math.min(nb, pool.length);
+      selectedQuestions = getRandomQuestions(pool, nb);
+
+      const photoInput = document.getElementById('photoInput');
+      const file = photoInput.files[0];
+      if (file) {
+        compressImage(file, 200, 200, 0.6).then(dataUrl => {
+          currentPhotoData = dataUrl;
+          lancerQuiz(username);
+        }).catch(() => {
+          const reader = new FileReader();
+          reader.onload = e => {
+            currentPhotoData = e.target.result;
+            lancerQuiz(username);
+          };
+          reader.readAsDataURL(file);
+        });
+      } else {
+        currentPhotoData = null;
+        lancerQuiz(username);
+      }
+    }
+
+    function lancerQuiz(username) {
+      currentQuestionIndex = 0; score = 0; timeLeft = 30; startTime = Date.now();
+      hideAllSections();
+      document.getElementById('quiz').style.display = 'block';
+      document.getElementById('titre').textContent = `Quiz ${currentLevel} - ${selectedQuestions.length} questions`;
+      showQuestion();
+      startTimer();
+    }
+
+    function getRandomQuestions(arr, nb) {
+      const shuffled = arr.slice().sort(() => 0.5 - Math.random());
+      return shuffled.slice(0, nb);
+    }
+
+    function showQuestion() {
+      if (currentQuestionIndex >= selectedQuestions.length) { endQuiz(); return; }
+      const q = selectedQuestions[currentQuestionIndex];
+      document.getElementById('question').innerHTML = (q.image ? `<img src="${q.image}" style="max-width:300px;"><br>` : '') + q.question;
+      const opts = document.getElementById('options');
+      opts.innerHTML = '';
+
+      const originalIndices = Array.from({ length: q.options.length }, (_, i) => i);
+      const shuffledIndices = shuffleArray([...originalIndices]);
+
+      shuffledIndices.forEach(originalIndex => {
+        const opt = q.options[originalIndex];
+        const btn = document.createElement('button');
+        btn.className = 'option';
+        btn.dataset.originalIndex = originalIndex;
+        if (typeof opt === 'object') {
+          btn.innerHTML = `<img src="${opt.image}" style="max-height:60px;"><br>${opt.text}`;
+        } else {
+          btn.textContent = opt;
+        }
+        btn.onclick = () => selectAnswer(originalIndex);
+        opts.appendChild(btn);
+      });
+
+      document.getElementById('feedback').textContent = '';
+      document.getElementById('scoreDisplay').textContent = `Score: ${score} / ${selectedQuestions.length}`;
+    }
+
+    function selectAnswer(selectedOriginalIndex) {
+      clearInterval(timer);
+      const q = selectedQuestions[currentQuestionIndex];
+      const correct = q.answer;
+      const allBtns = document.querySelectorAll('#options button.option');
+      allBtns.forEach(b => b.disabled = true);
+
+      let feedbackText = '';
+      if (selectedOriginalIndex === -1) {
+        feedbackText = `Temps écoulé ! Réponse: ${getOptionText(q.options[correct])}`;
+      } else if (selectedOriginalIndex === correct) {
+        score++;
+        feedbackText = 'Bonne réponse !';
+      } else {
+        feedbackText = `Faux. Réponse: ${getOptionText(q.options[correct])}`;
+      }
+      document.getElementById('feedback').textContent = feedbackText;
+
+      const correctBtn = document.querySelector(`#options button[data-original-index="${correct}"]`);
+      if (correctBtn) correctBtn.classList.add('correct');
+
+      if (selectedOriginalIndex !== -1 && selectedOriginalIndex !== correct) {
+        const wrongBtn = document.querySelector(`#options button[data-original-index="${selectedOriginalIndex}"]`);
+        if (wrongBtn) wrongBtn.classList.add('wrong');
+      }
+
+      document.getElementById('scoreDisplay').textContent = `Score: ${score} / ${selectedQuestions.length}`;
+
+      const oldNext = document.getElementById('nextBtn');
+      if (oldNext) oldNext.remove();
+
+      const nextBtn = document.createElement('button');
+      nextBtn.id = 'nextBtn';
+      nextBtn.textContent = 'Suivant';
+      nextBtn.onclick = nextQuestion;
+      document.getElementById('options').appendChild(nextBtn);
+    }
+
+    function nextQuestion() {
+      currentQuestionIndex++; timeLeft = 30;
+      showQuestion(); startTimer();
+    }
+
+    function startTimer() {
+      document.getElementById('timer').textContent = `Temps restant: ${timeLeft}s`;
+      timer = setInterval(() => {
+        timeLeft--;
+        document.getElementById('timer').textContent = `Temps restant: ${timeLeft}s`;
+        if (timeLeft <= 0) { clearInterval(timer); selectAnswer(-1); }
+      }, 1000);
+    }
+
+    function endQuiz() {
+      clearInterval(timer);
+      hideAllSections();
+      document.getElementById('resultat').style.display = 'block';
+      const username = document.getElementById('username').value.trim();
+      const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+      document.getElementById('finalScore').textContent = `${username}, score: ${score}/${selectedQuestions.length}`;
+      let results = JSON.parse(localStorage.getItem('quizResults') || '[]');
+      const groupLabel = qcmGroups[currentLevel].find(g => g.courses[0] === selectedCourses[0] && g.courses.length === selectedCourses.length)?.label || selectedCourses.join(' + ');
+      results.push({
+        name: username, niveau: currentLevel,
+        course: groupLabel, score, time: timeSpent,
+        date: new Date().toLocaleString(), photo: currentPhotoData
+      });
+      localStorage.setItem('quizResults', JSON.stringify(results));
+    }
+
+    function retourAccueil() {
+      hideAllSections();
+      document.getElementById('start').style.display = 'block';
+      document.getElementById('photoPreview').style.display = 'none';
+      document.getElementById('photoInput').value = '';
+      currentPhotoData = null;
+    }
+
+    function restartGame() {
+      hideAllSections();
+      document.getElementById('quiz').style.display = 'block';
+      currentQuestionIndex=0; score=0; timeLeft=30; startTime=Date.now();
+      showQuestion(); startTimer();
+    }
+
+    // ======================== EXPORT CSV ========================
+    function exportResultsToCSV() {
+      const results = JSON.parse(localStorage.getItem('quizResults') || '[]');
+      if (results.length === 0) {
+        alert('Aucun résultat à exporter.');
+        return;
+      }
+
+      const headers = ["Nom", "Niveau", "Groupe QCM", "Score", "Temps (s)", "Date", "Photo présente"];
+      
+      function escapeCSV(cell) {
+        if (cell === undefined || cell === null) cell = '';
+        const str = String(cell);
+        if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+          return '"' + str.replace(/"/g, '""') + '"';
+        }
+        return str;
+      }
+
+      const rows = results.map(r => [
+        escapeCSV(r.name),
+        escapeCSV(r.niveau),
+        escapeCSV(r.course),
+        escapeCSV(r.score),
+        escapeCSV(r.time),
+        escapeCSV(r.date),
+        escapeCSV(r.photo ? "Oui" : "Non")
+      ]);
+
+      const csvContent = [headers.map(escapeCSV).join(','), ...rows.map(row => row.join(','))].join('\n');
+      const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.href = url;
+      link.setAttribute("download", `resultats_quiz_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
+    // ======================== ADMINISTRATION (sans graphiques secondaires) ========================
+    function chargerAdmin() {
+      let results = JSON.parse(localStorage.getItem('quizResults') || '[]');
+      // --- Stats globales ---
+      let eleves = {};
+      results.forEach(r => {
+        const key = r.name + '||' + (r.niveau || 'N/C');
+        if (!eleves[key]) {
+          eleves[key] = {
+            nom: r.name, niveau: r.niveau || 'N/C',
+            nbQuiz: 0, scoreTotal: 0, derniereDate: '', photo: r.photo || null
+          };
+        }
+        eleves[key].nbQuiz++;
+        eleves[key].scoreTotal += r.score;
+        if (r.date > eleves[key].derniereDate) eleves[key].derniereDate = r.date;
+        if (r.photo && !eleves[key].photo) eleves[key].photo = r.photo;
+      });
+      let listeEleves = Object.values(eleves).sort((a,b) => b.scoreTotal - a.scoreTotal);
+
+      const nbEleves = listeEleves.length;
+      const totalQuiz = results.length;
+      const totalScoreGlobal = results.reduce((s,r) => s + r.score, 0);
+      const moyenneGlobale = totalQuiz ? (totalScoreGlobal / totalQuiz).toFixed(1) : 0;
+
+      document.getElementById('adminStatsCards').innerHTML = `
+        <div class="stat-card"><div class="number">${nbEleves}</div><div class="label">👨‍🎓 Élèves</div></div>
+        <div class="stat-card"><div class="number">${totalQuiz}</div><div class="label">📝 Quiz</div></div>
+        <div class="stat-card"><div class="number">${totalScoreGlobal}</div><div class="label">⭐ Score</div></div>
+        <div class="stat-card"><div class="number">${moyenneGlobale}</div><div class="label">📊 Moy./quiz</div></div>
+      `;
+
+      // Tableau global
+      const tbody = document.getElementById('adminBody');
+      tbody.innerHTML = '';
+      if (listeEleves.length === 0) tbody.innerHTML = '<tr><td colspan="7">Aucun résultat.</td></tr>';
+      else listeEleves.forEach(e => {
+        tbody.innerHTML += `<tr>
+          <td>${e.photo ? `<img src="${e.photo}" width="40" height="40" style="border-radius:50%">` : '—'}</td>
+          <td>${e.nom}</td><td>${e.niveau}</td><td>${e.nbQuiz}</td>
+          <td>${e.scoreTotal}</td><td>${(e.scoreTotal/e.nbQuiz).toFixed(1)}</td>
+          <td>${e.derniereDate || '-'}</td>
+        </tr>`;
+      });
+
+      // Graphique global (premier graphique, conservé)
+      renderMainChart(listeEleves);
+
+      // --- Résultats par QCM (tableaux uniquement, sans graphiques) ---
+      const perQcmDiv = document.getElementById('perQcmContainer');
+      perQcmDiv.innerHTML = '';
+
+      Object.values(qcmGroups).flat().forEach(group => {
+        const matches = results.filter(r => r.course === group.label);
+        if (matches.length === 0) return;
+
+        const groupDiv = document.createElement('div');
+        groupDiv.className = 'qcm-group';
+        groupDiv.innerHTML = `<h4>${group.label} (${matches.length} quiz)</h4>`;
+
+        const table = document.createElement('table');
+        table.className = 'group-table';
+        table.innerHTML = `<thead><tr><th>Nom</th><th>Niveau</th><th>Score</th><th>Temps (s)</th><th>Date</th></tr></thead><tbody></tbody>`;
+        const tbodyGroup = table.querySelector('tbody');
+        matches.forEach(r => {
+          tbodyGroup.innerHTML += `<tr><td>${r.name}</td><td>${r.niveau}</td><td>${r.score}</td><td>${r.time}</td><td>${r.date}</td></tr>`;
+        });
+        groupDiv.appendChild(table);
+        perQcmDiv.appendChild(groupDiv);
+      });
+    }
+
+    function renderMainChart(listeEleves) {
+      const ctx = document.getElementById('adminChart').getContext('2d');
+      if (adminChart) adminChart.destroy();
+      if (listeEleves.length === 0) return;
+      const labels = listeEleves.map(e => `${e.nom} (${e.niveau})`);
+      const data = listeEleves.map(e => e.scoreTotal);
+      adminChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels, datasets: [{
+            label: 'Score total', data,
+            backgroundColor: 'rgba(52, 152, 219, 0.7)',
+            borderColor: 'rgba(41, 128, 185, 1)',
+            borderWidth: 2, borderRadius: 8
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    }
+
+    function clearResultsAdmin() {
+      if (confirm('Supprimer tous les résultats ?')) {
+        localStorage.removeItem('quizResults');
+        chargerAdmin();
+      }
+    }
+
+    // ======================== INIT ========================
+    window.onload = function() {
+      mettreAJourCours();
+      hideAllSections();
+      document.getElementById('start').style.display = 'block';
+    };
+  </script>
+</body>
+</html>
